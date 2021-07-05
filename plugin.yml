@@ -1,0 +1,5 @@
+name: PMRemote
+api: 3.0.0
+main: AkmalFairuz\PMRemote\Main
+description: Remote or monitor your server via browser.
+version: 1.0.0
