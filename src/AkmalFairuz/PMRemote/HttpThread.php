@@ -109,7 +109,7 @@ class HttpThread extends Thread{
                             $this->requestIp = $ip;
                             $this->requestPort = $port;
 
-                            $this->synchronized(function() use ($client) : void{
+                            $this->synchronized(function() : void{
                                 $this->notifier->wakeupSleeper();
                                 $this->wait();
                             });
