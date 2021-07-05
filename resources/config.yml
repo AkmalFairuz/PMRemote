@@ -1,2 +1,5 @@
 http-bind-ip: 0.0.0.0
 http-bind-port: 8080
+
+# If debug mode disabled, all error messages will not shown to HTTP response.
+debug-mode: true

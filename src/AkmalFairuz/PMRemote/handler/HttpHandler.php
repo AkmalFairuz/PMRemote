@@ -6,7 +6,7 @@ namespace AkmalFairuz\PMRemote\handler;
 
 use AkmalFairuz\PMRemote\client\Client;
 use AkmalFairuz\PMRemote\Main;
-use pocketmine\Server;
+use AkmalFairuz\PMRemote\utils\Route;
 use Throwable;
 
 class HttpHandler{
@@ -14,15 +14,11 @@ class HttpHandler{
     /** @var int */
     private $requestId = 0;
 
-    public function handle(Client $client) {
-        // TODO: styling, javascript, more features...
-        return $this->buildResponse(
-            "<h1>Server TPS: " . Server::getInstance()->getTicksPerSecond() .
-            "<br>Players: " . count(Server::getInstance()->getOnlinePlayers()) . "/" . Server::getInstance()->getMaxPlayers() .
-            "<br>Server Load: ".Server::getInstance()->getTickUsage()."</h1>");
+    public function handle(Client $client) : string {
+        return $this->buildResponse(Route::run($client));
     }
 
-    public function handleError(Throwable $t) {
+    public function handleError(Throwable $t) : string {
         return $this->buildResponse("<h1>500 Internal Server Error</h1>".str_replace("\n", "<br>", $t), "text/html", null, 500, "Internal Server Error");
     }
 

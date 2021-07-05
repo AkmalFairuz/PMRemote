@@ -2,13 +2,16 @@
 
 declare(strict_types=1);
 
-namespace AkmalFairuz\PMRemote\style;
+namespace AkmalFairuz\PMRemote\utils;
+
+use AkmalFairuz\PMRemote\Main;
 
 class Style{
 
     public static function create(string $title) {
         $style = new self;
         $style->title = $title;
+        return $style;
     }
 
     /** @var string */
@@ -27,6 +30,7 @@ class Style{
         } else{
             $this->yield[$name] .= $value;
         }
+        return $this;
     }
 
     public function render() {
@@ -36,9 +40,9 @@ class Style{
     <title>' . $this->title . '</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <link href="/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/css/bootstrap-dark.min.css" rel="stylesheet">
     <link href="/css/font-awesome.min.css" rel="stylesheet">
-    <link href="/css/pecomm.css" rel="stylesheet">
+    <link href="/css/pmremote.css" rel="stylesheet">
 </head>
 <body>
     <header>
@@ -65,10 +69,13 @@ class Style{
     <footer class="footer bg-secondary">
       <div class="container">
         <span class="text-light text-center">
-            This server use PMRemote: <a href="https://github.com/AkmalFairuz/PMRemote">GitHub</a>
+            This server use ' . Main::SERVER . ': <a href="https://github.com/AkmalFairuz/PMRemote">GitHub</a>
         </span>
       </div>
     </footer>
+    <script src="/js/jquery.min.js"></script>
+    <script src="/js/bootstrap.min.js"></script>
+    <script src="/js/popper.min.js"></script>
 </body></html>';
     }
 }

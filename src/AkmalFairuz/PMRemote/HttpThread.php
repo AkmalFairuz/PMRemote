@@ -8,6 +8,7 @@ use pocketmine\snooze\SleeperNotifier;
 use pocketmine\Thread;
 use ClassLoader;
 use AttachableThreadedLogger;
+use pocketmine\utils\TextFormat;
 
 class HttpThread extends Thread{
 
@@ -71,9 +72,18 @@ class HttpThread extends Thread{
         /** @var string[] $blockedIps */
         $blockedIps = [];
 
+        /** @var resource[] $pendingClients */
+        $pendingClients = [];
+
+        /** @var int[] $timeout */
+        $timeout = [];
+
+        /** @var int $nextClientId */
+        $nextClientId = 0;
+
         while(!$this->shutdown) {
             $start = microtime(true);
-            $this->onTick($blockedIps);
+            $this->onTick($blockedIps, $pendingClients, $timeout, $nextClientId);
             $time = microtime(true);
             if ($time - $start < 0.01) {
                 time_sleep_until($time + 0.01 - ($time - $start));
@@ -83,9 +93,16 @@ class HttpThread extends Thread{
         $this->close();
     }
 
-    private function onTick(&$blockedIps) {
+    private function onTick(&$blockedIps, &$pendingClients, &$timeout, &$nextClientId) {
+        $disconnect = [];
         if(($client = socket_accept($this->socket)) !== false){
-            $buf = @socket_read($client, 65535);
+            $id = $nextClientId++;
+            $pendingClients[$id] = $client;
+            $timeout[$id] = time() + 5;
+        }
+
+        foreach($pendingClients as $id => $client) {
+            $buf = socket_read($client, 65535);
             if($buf != null){
                 $path = explode(" ", $buf)[1] ?? null;
                 socket_getpeername($client, $ip, $port);
@@ -93,16 +110,30 @@ class HttpThread extends Thread{
                     if($blockedIps[$ip] >= time()) {
                         unset($blockedIps[$ip]);
                         @socket_write($client, "HTTP/1.1 200 OK\r\nLocation: /");
+                        $disconnect[$id] = true;
                     }
                 }else{
                     if($path === null){
                         // invalid http request (possible hack attempt), block for 10 minutes
                         $blockedIps[$ip] = time() + 600;
+                        $this->logger->info("Invalid HTTP Request from $ip/$port and blocked for 10 minutes");
                         return;
                     }else{
                         $fullPath = $this->rootPath . $path;
                         if(is_file($fullPath)){
-                            @socket_write($client, "HTTP/1.1 200 OK\r\nContent-Type: " . $this->getContentType($fullPath) . "\r\nServer: " . Main::SERVER . "\r\n\r\n" . file_get_contents($fullPath));
+                            $content = file_get_contents($fullPath);
+                            $len = strlen($content);
+                            if($len >= 1024){
+                                $chunks = str_split(zlib_encode($content, ZLIB_ENCODING_GZIP, 9), 128);
+                                @socket_write($client, "HTTP/1.1 200 OK\r\nContent-Type: " . $this->getContentType($fullPath) . "\r\nContent-Length".$len."\r\nContent-Encoding: gzip\r\nTransfer-Encoding: chunked\r\nServer: " . Main::SERVER . "\r\n\r\n");
+                                foreach($chunks as $chunk){
+                                    @socket_write($client, dechex(strlen($chunk))."\r\n".$chunk."\r\n");
+                                }
+                                @socket_write($client, "0\r\n\r\n");
+                            } else {
+                                @socket_write($client, "HTTP/1.1 200 OK\r\nContent-Type: " . $this->getContentType($fullPath) . "\r\nContent-Length: ".$len."\r\nServer: " . Main::SERVER . "\r\n\r\n" . $content);
+                            }
+                            $disconnect[$id] = true;
                         }else{
                             $this->requestBuffer = $buf;
 
@@ -119,8 +150,19 @@ class HttpThread extends Thread{
                         }
                     }
                 }
-                $this->disconnect($client);
+                if($timeout[$id] >= time()) {
+                    $disconnect[$id] = true;
+                }
+            } elseif($buf === false) {
+                $disconnect[$id] = true;
             }
+        }
+
+        foreach($disconnect as $id => $val) {
+            @socket_read($pendingClients[$id], 65535);
+            @socket_shutdown($pendingClients[$id]);
+            @socket_close($pendingClients[$id]);
+            unset($pendingClients[$id], $timeout[$id]);
         }
     }
 
@@ -142,9 +184,5 @@ class HttpThread extends Thread{
     private function close() {
         @socket_shutdown($this->socket);
         unset($this->socket);
-    }
-
-    private function disconnect($socket) {
-        @socket_close($socket);
     }
 }
